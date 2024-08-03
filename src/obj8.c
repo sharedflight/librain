@@ -225,6 +225,34 @@ obj8_cmd_alloc(obj8_cmd_type_t type, obj8_cmd_t *parent)
 	return (cmd);
 }
 
+static bool
+find_dr_with_offset(char *dr_name, dr_t *dr, int *offset)
+{
+	char *bracket;
+
+	if (dr_find(dr, "%s", dr_name)) {
+		*offset = -1;
+		logMsg("[DEBUG] Found dataref %s", dr_name);
+		return (true);
+	}
+	bracket = strrchr(dr_name, '[');
+	if (bracket != NULL) {
+		int cap;
+
+		*bracket = 0;
+		if (!dr_find(dr, "%s", dr_name))
+			return (false);
+		cap = dr_getvf32(dr, NULL, 0, 0);
+		if (cap == 0)
+			return (false);
+		*offset = clampi(atoi(&bracket[1]), 0, cap - 1);
+		logMsg("[DEBUG] Found dataref %s", dr_name);
+		return (true);
+	}
+
+	return (false);
+}
+
 static bool_t
 parse_hide_show(obj8_t *obj, bool_t set_val, const char *fmt,
     const char *line, const char *filename, int linenr, obj8_cmd_t *parent)
@@ -433,9 +461,63 @@ parse_ATTR_manip_toggle(const char *line, obj8_t *obj)
 }
 
 static unsigned
+parse_ATTR_manip_push(const char *line, obj8_t *obj)
+{
+	obj8_manip_t *manip;
+	char cursor[32], dr_name[256];
+	float v1, v2;
+
+	ASSERT(line != NULL);
+	ASSERT(obj != NULL);
+
+	if (sscanf(line, "ATTR_manip_push %31s %f %f %255s",
+	    cursor, &v1, &v2, dr_name) != 4) {
+		return (-1u);
+	}
+	manip = alloc_manip(obj, OBJ8_MANIP_PUSH, cursor);
+	manip->toggle.drset_idx = obj8_drset_add(obj->drset, dr_name, 0);
+	manip->toggle.v1 = v1;
+	manip->toggle.v2 = v2;
+
+	return (obj->n_manips - 1);
+}
+
+static unsigned
 parse_ATTR_manip_noop(obj8_t *obj)
 {
 	(void)alloc_manip(obj, OBJ8_MANIP_NOOP, "arrow");
+	return (obj->n_manips - 1);
+}
+
+static unsigned
+parse_ATTR_manip_axis_knob(const char *line, obj8_t *obj)
+{
+	obj8_manip_t *manip;
+	
+	float		min, max;
+	float		d_click, d_hold;
+	char cursor[32], dr_name[256], dr_name_copy[256]; 
+
+	ASSERT(line != NULL);
+	ASSERT(obj != NULL);
+
+	if (sscanf(line, "ATTR_manip_axis_knob %31s %f %f %f %f %255s",
+	    cursor, &min, &max, &d_click, &d_hold, dr_name) != 6) {
+		return (-1u);
+	}
+
+	manip = alloc_manip(obj, OBJ8_MANIP_AXIS_KNOB, cursor);
+	manip->manip_axis_knob.min = min;
+	manip->manip_axis_knob.max = max;
+	manip->manip_axis_knob.d_click = d_click;
+	manip->manip_axis_knob.d_hold = d_hold;
+	
+	strcpy(dr_name_copy, dr_name);
+
+	if (!find_dr_with_offset(dr_name_copy, &manip->manip_axis_knob.dr, &manip->manip_axis_knob.dr_offset)) {
+		return (-1u);
+	}
+
 	return (obj->n_manips - 1);
 }
 
@@ -612,6 +694,20 @@ obj8_parse_worker(void *userinfo)
 	for (int linenr = 1; lacf_getline(&line, &cap, fp) > 0 &&
 	    !obj->load_stop; linenr++) {
 		strip_space(line);
+
+		if (line[0] == '#') {
+			continue;
+		}
+		// if (strncmp(line, "I", 1) == 0) {
+		// 	continue;
+		// }
+		if (strlen(line) == 0) {
+			continue;
+		}
+		if (strncmp(line, "NORMAL_METALNESS", 16) == 0) {
+			logMsg("[WARN] Unhandled line: %s", line);
+			continue;
+		}
 
 		if (strncmp(line, "VT", 2) == 0) {
 			obj8_vtx_t *vtx;
@@ -827,6 +923,17 @@ obj8_parse_worker(void *userinfo)
 				cmd->drset_idx = obj8_drset_add(
 				    obj->drset, NULL, 0);
 			}
+		} else if (strncmp(line, "ATTR_manip_wheel", 16) == 0) {
+			float wheel_delta;
+			if (cur_manip == -1u) {
+				logMsg("[ERROR] Found ATTR_manip_wheel without a current manip");
+				continue;
+			} else if (sscanf(line, "ATTR_manip_wheel %f", &wheel_delta) != 1) {
+				logMsg("[ERROR] Found ATTR_manip_wheel but was unable to parse it");
+				continue;
+			} else {
+				obj->manips[cur_manip].wheel_delta = wheel_delta;
+			}
 		} else if (strncmp(line, "ATTR_draw_enable", 16) == 0) {
 			(void)obj8_cmd_alloc(OBJ8_CMD_ATTR_DRAW_ENABLE,
 			    cur_cmd);
@@ -834,7 +941,9 @@ obj8_parse_worker(void *userinfo)
 			(void)obj8_cmd_alloc(OBJ8_CMD_ATTR_DRAW_DISABLE,
 			    cur_cmd);
 		} else if (strncmp(line, "ATTR_manip_none", 15) == 0) {
-			cur_manip = -1;
+			cur_manip = -1u;
+		} else if (strncmp(line, "ATTR_manip_axis_knob", 20) == 0) {
+			cur_manip = parse_ATTR_manip_axis_knob(line, obj);
 		} else if (strncmp(line, "ATTR_manip_command_axis", 23) == 0) {
 			cur_manip = parse_ATTR_manip_command_axis(line, obj);
 		} else if (strncmp(line, "ATTR_manip_command_knob", 23) == 0) {
@@ -852,6 +961,27 @@ obj8_parse_worker(void *userinfo)
 			cur_manip = parse_ATTR_manip_toggle(line, obj);
 		} else if (strncmp(line, "ATTR_manip_noop", 15) == 0) {
 			cur_manip = parse_ATTR_manip_noop(obj);
+		} else if (strncmp(line, "ATTR_manip_push", 15) == 0) {
+			cur_manip = parse_ATTR_manip_push(line, obj);
+		} else if (strncmp(line, "ATTR_manip_keyframe", 19) == 0) {
+			logMsg("[WARN] Found unhandled ATTR_manip_keyframe line, see notes below this line in the code");
+			// CONCERN: This is whats used in ANIM_rotate_key...
+			//if (!parse_rotate_key(line, cur_anim, filename, linenr))
+			// NEED TO MODIFY 
+			// 	struct {
+			// 	vect3_t		xyz;
+			// 	vect3_t		dir;
+			// 	float		angle1, angle2;
+			// 	float		lift;
+			// 	float		v1min, v1max;
+			// 	float		v2min, v2max;
+			// 	unsigned	drset_idx1, drset_idx2;
+			// } drag_rot;
+			// TO ALLOW FOR KEYFRAMES.....
+			// ALSO LOOKS LIKE NEED TO HANDLE detents??
+			//	goto errout;
+		} else if (strncmp(line, "ATTR_manip_", 11) == 0) {
+			logMsg("[ERROR] Found unhandled manipulator line: %s", line);
 		} else if (strncmp(line, "POINT_COUNTS", 12) == 0) {
 			unsigned lines, lites;
 
@@ -893,6 +1023,8 @@ obj8_parse_worker(void *userinfo)
 				obj->tex_filename = path_last_comp_subst(
 				    obj->filename, buf);
 			}
+		} else {
+			logMsg("[DEBUG] Unparsed line:\n%s", line);
 		}
 	}
 
@@ -1246,6 +1378,7 @@ static double
 rotation_get_angle(const obj8_t *obj, obj8_cmd_t *cmd, const float *dr_values)
 {
 	double val = cmd_dr_read(cmd, dr_values);
+	
 	size_t n = cmd->rotate.n_pts;
 
 	/* Too few points to animate anything */
@@ -1779,40 +1912,19 @@ obj8_drset_mark_complete(obj8_drset_t *drset)
 	drset->complete = true;
 }
 
-static bool
-find_dr_with_offset(char *dr_name, dr_t *dr, int *offset)
-{
-	char *bracket;
-
-	if (dr_find(dr, "%s", dr_name)) {
-		*offset = -1;
-		return (true);
-	}
-	bracket = strrchr(dr_name, '[');
-	if (bracket != NULL) {
-		int cap;
-
-		*bracket = 0;
-		if (!dr_find(dr, "%s", dr_name))
-			return (false);
-		cap = dr_getvf32(dr, NULL, 0, 0);
-		if (cap == 0)
-			return (false);
-		*offset = clampi(atoi(&bracket[1]), 0, cap - 1);
-		return (true);
-	}
-
-	return (false);
-}
-
 static inline float
 drset_dr_updatef(drset_dr_t *dr)
 {
 	float v;
 
 	if (COND_UNLIKELY(!dr->dr_found)) {
-		if (COND_LIKELY(dr->dr_lookup_done > MAX_DR_LOOKUPS))
+		if (COND_LIKELY(dr->dr_lookup_done > MAX_DR_LOOKUPS)) {
+			if (COND_UNLIKELY(dr->dr_lookup_done == MAX_DR_LOOKUPS + 1)) {
+				logMsg("[WARNING] Dataref reached max lookup...");
+				dr->dr_lookup_done++;
+			}
 			return (0);
+		}
 		dr->dr_lookup_done++;
 		if (!find_dr_with_offset(dr->dr_name, &dr->dr,
 		    &dr->dr_offset)) {
@@ -1825,7 +1937,7 @@ drset_dr_updatef(drset_dr_t *dr)
 	else
 		v = dr_getf(&dr->dr);
 	if (COND_UNLIKELY(!isfinite(v))) {
-		logMsg("Bad animation dataref %s = %f. Bailing out. "
+		logMsg("[ERROR] Bad animation dataref %s = %f. Bailing out. "
 		    "Report this as a bug and attach the log file.",
 		    dr->dr_name, v);
 		return (0);

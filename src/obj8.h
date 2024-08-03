@@ -51,6 +51,7 @@ typedef enum {
 	OBJ8_MANIP_DRAG_ROTATE,
 	OBJ8_MANIP_DRAG_XY,
 	OBJ8_MANIP_TOGGLE,
+	OBJ8_MANIP_PUSH,
 	OBJ8_MANIP_NOOP
 } obj8_manip_type_t;
 
@@ -87,11 +88,13 @@ typedef struct {
 	obj8_manip_type_t	type;
 	obj8_manip_cursor_t	cursor;
 	char			cmdname[128];
+	float wheel_delta;
 	union {
 		struct {
 			float		min, max;
 			float		d_click, d_hold;
 			dr_t		dr;
+			int         dr_offset;
 		} manip_axis_knob;
 		XPLMCommandRef		cmd;
 		struct {
