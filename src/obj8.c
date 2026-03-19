@@ -454,11 +454,9 @@ parse_ATTR_manip_command(const char *line, obj8_t *obj)
 	if (sscanf(line, "ATTR_manip_command %31s %255s", cursor, cmdname) != 2)
 		return (-1u);
 	manip = alloc_manip(obj, OBJ8_MANIP_COMMAND, cursor);
-	manip->cmd = XPLMFindCommand(cmdname);
+	manip->cmd = NULL;
+	manip->needs_resolve = true;
 	strlcpy(manip->cmdname, cmdname, sizeof (manip->cmdname));
-	if (manip->cmd == NULL) {
-		return (-1u);
-	}
 	return (obj->n_manips - 1);
 }
 
@@ -538,15 +536,8 @@ parse_ATTR_manip_axis_knob(const char *line, obj8_t *obj)
 	manip->manip_axis_knob.d_click = d_click;
 	manip->manip_axis_knob.d_hold = d_hold;
 
-	strcpy(dr_name_copy, dr_name);
-
-	if (!find_dr_with_offset(dr_name_copy, &manip->manip_axis_knob.dr, &manip->manip_axis_knob.dr_offset)) {
-		return (-1u);
-	}
-
-	logMsg("Found dr_name of %s (%s) for index %d", dr_name, manip->manip_axis_knob.dr.name, obj->n_manips - 1);
-
-	logMsg("Found dr_name of %s (%s) for index %d", dr_name, manip->manip_axis_knob.dr.name, obj->n_manips - 1);
+	strlcpy(manip->drname, dr_name, sizeof(manip->drname));
+	manip->needs_resolve = true;
 
 	return (obj->n_manips - 1);
 }		
@@ -565,12 +556,11 @@ parse_ATTR_manip_command_knob(const char *line, obj8_t *obj)
 		return (-1u);
 	}
 	manip = alloc_manip(obj, OBJ8_MANIP_COMMAND_KNOB, cursor);
-	manip->cmd_knob.pos_cmd = XPLMFindCommand(pos_cmdname);
-	manip->cmd_knob.neg_cmd = XPLMFindCommand(neg_cmdname);
-	/*if (manip->cmd_knob.pos_cmd == NULL ||
-	    manip->cmd_knob.neg_cmd == NULL) {
-		return (-1u);
-	}*/
+	manip->cmd_knob.pos_cmd = NULL;
+	manip->cmd_knob.neg_cmd = NULL;
+	strlcpy(manip->cmdname, pos_cmdname, sizeof(manip->cmdname));
+	strlcpy(manip->cmdname2, neg_cmdname, sizeof(manip->cmdname2));
+	manip->needs_resolve = true;
 	return (obj->n_manips - 1);
 }
 
@@ -588,12 +578,11 @@ parse_ATTR_manip_command_switch_lr(const char *line, obj8_t *obj)
 		return (-1u);
 	}
 	manip = alloc_manip(obj, OBJ8_MANIP_COMMAND_SWITCH_LR, cursor);
-	manip->cmd_knob.pos_cmd = XPLMFindCommand(pos_cmdname);
-	manip->cmd_knob.neg_cmd = XPLMFindCommand(neg_cmdname);
-	/*if (manip->cmd_knob.pos_cmd == NULL ||
-	    manip->cmd_knob.neg_cmd == NULL) {
-		return (-1u);
-	}*/
+	manip->cmd_knob.pos_cmd = NULL;
+	manip->cmd_knob.neg_cmd = NULL;
+	strlcpy(manip->cmdname, pos_cmdname, sizeof(manip->cmdname));
+	strlcpy(manip->cmdname2, neg_cmdname, sizeof(manip->cmdname2));
+	manip->needs_resolve = true;
 	return (obj->n_manips - 1);
 }
 
@@ -611,12 +600,11 @@ parse_ATTR_manip_command_switch_ud(const char *line, obj8_t *obj)
 		return (-1u);
 	}
 	manip = alloc_manip(obj, OBJ8_MANIP_COMMAND_SWITCH_UD, cursor);
-	manip->cmd_knob.pos_cmd = XPLMFindCommand(pos_cmdname);
-	manip->cmd_knob.neg_cmd = XPLMFindCommand(neg_cmdname);
-	/*if (manip->cmd_knob.pos_cmd == NULL ||
-	    manip->cmd_knob.neg_cmd == NULL) {
-		return (-1u);
-	}*/
+	manip->cmd_knob.pos_cmd = NULL;
+	manip->cmd_knob.neg_cmd = NULL;
+	strlcpy(manip->cmdname, pos_cmdname, sizeof(manip->cmdname));
+	strlcpy(manip->cmdname2, neg_cmdname, sizeof(manip->cmdname2));
+	manip->needs_resolve = true;
 	return (obj->n_manips - 1);
 }
 
@@ -632,10 +620,9 @@ parse_ATTR_manip_command_switch_lr2(const char *line, obj8_t *obj)
 	if (sscanf(line, "ATTR_manip_command_switch_left_right2 %31s %255s", cursor, cmdname) != 2)
 		return (-1u);
 	manip = alloc_manip(obj, OBJ8_MANIP_COMMAND_SWITCH_LR2, cursor);
-	manip->cmd_sw2 = XPLMFindCommand(cmdname);
+	manip->cmd_sw2 = NULL;
+	manip->needs_resolve = true;
 	strlcpy(manip->cmdname, cmdname, sizeof (manip->cmdname));
-	//if (manip->cmd == NULL)
-	//	return (-1u);
 
 	return (obj->n_manips - 1);
 }
@@ -652,12 +639,11 @@ parse_ATTR_manip_command_switch_ud2(const char *line, obj8_t *obj)
 	if (sscanf(line, "ATTR_manip_command_switch_up_down2 %31s %255s", cursor, cmdname) != 2)
 		return (-1u);
 	manip = alloc_manip(obj, OBJ8_MANIP_COMMAND_SWITCH_UD2, cursor);
-	manip->cmd_sw2 = XPLMFindCommand(cmdname);
-	if (manip->cmd_sw2 == NULL)
-		return (-1u);
+	manip->cmd_sw2 = NULL;
+	manip->needs_resolve = true;
 
 	strlcpy(manip->cmdname, cmdname, sizeof (manip->cmdname));
-	
+
 	return (obj->n_manips - 1);
 }
 
@@ -677,12 +663,11 @@ parse_ATTR_manip_command_axis(const char *line, obj8_t *obj)
 	}
 	manip = alloc_manip(obj, OBJ8_MANIP_COMMAND_AXIS, cursor);
 	manip->cmd_axis.d = d;
-	manip->cmd_axis.pos_cmd = XPLMFindCommand(pos_cmdname);
-	manip->cmd_axis.neg_cmd = XPLMFindCommand(neg_cmdname);
-	/*if (manip->cmd_axis.pos_cmd == NULL ||
-	    manip->cmd_axis.neg_cmd == NULL) {
-		return (-1u);
-	}*/
+	manip->cmd_axis.pos_cmd = NULL;
+	manip->cmd_axis.neg_cmd = NULL;
+	strlcpy(manip->cmdname, pos_cmdname, sizeof(manip->cmdname));
+	strlcpy(manip->cmdname2, neg_cmdname, sizeof(manip->cmdname2));
+	manip->needs_resolve = true;
 	return (obj->n_manips - 1);
 }
 
@@ -1418,6 +1403,62 @@ obj8_needs_upload(const obj8_t *obj)
 {
 	ASSERT(obj != NULL);
 	return (obj->load_complete && !obj->load_error && obj->vtx_buf == 0);
+}
+
+void
+obj8_resolve_commands(obj8_t *obj)
+{
+	ASSERT(obj != NULL);
+	ASSERT(obj->load_complete);
+
+	for (unsigned i = 0; i < obj->n_manips; i++) {
+		obj8_manip_t *manip = &obj->manips[i];
+		if (!manip->needs_resolve)
+			continue;
+		manip->needs_resolve = false;
+
+		switch (manip->type) {
+		case OBJ8_MANIP_COMMAND:
+			manip->cmd = XPLMFindCommand(manip->cmdname);
+			if (manip->cmd == NULL) {
+				logMsg("[ERROR] obj8_resolve: command not "
+				    "found: %s", manip->cmdname);
+			}
+			break;
+		case OBJ8_MANIP_COMMAND_KNOB:
+		case OBJ8_MANIP_COMMAND_SWITCH_LR:
+		case OBJ8_MANIP_COMMAND_SWITCH_UD:
+			manip->cmd_knob.pos_cmd =
+			    XPLMFindCommand(manip->cmdname);
+			manip->cmd_knob.neg_cmd =
+			    XPLMFindCommand(manip->cmdname2);
+			break;
+		case OBJ8_MANIP_COMMAND_SWITCH_LR2:
+		case OBJ8_MANIP_COMMAND_SWITCH_UD2:
+			manip->cmd_sw2 = XPLMFindCommand(manip->cmdname);
+			break;
+		case OBJ8_MANIP_COMMAND_AXIS:
+			manip->cmd_axis.pos_cmd =
+			    XPLMFindCommand(manip->cmdname);
+			manip->cmd_axis.neg_cmd =
+			    XPLMFindCommand(manip->cmdname2);
+			break;
+		case OBJ8_MANIP_AXIS_KNOB: {
+			char drname_copy[256];
+			strlcpy(drname_copy, manip->drname,
+			    sizeof(drname_copy));
+			if (!find_dr_with_offset(drname_copy,
+			    &manip->manip_axis_knob.dr,
+			    &manip->manip_axis_knob.dr_offset)) {
+				logMsg("[ERROR] obj8_resolve: dataref not "
+				    "found: %s", manip->drname);
+			}
+			break;
+		}
+		default:
+			break;
+		}
+	}
 }
 
 static unsigned

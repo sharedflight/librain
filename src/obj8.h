@@ -92,7 +92,10 @@ typedef struct {
 	unsigned		cmdidx;
 	obj8_manip_type_t	type;
 	obj8_manip_cursor_t	cursor;
+	bool			needs_resolve;
 	char			cmdname[128];
+	char			cmdname2[128];
+	char			drname[256];
 	union {
 		struct {
 			float		min, max;
@@ -162,6 +165,7 @@ typedef struct {
 LIBRAIN_EXPORT obj8_t *obj8_parse(const char *filename, vect3_t pos_offset);
 LIBRAIN_EXPORT void obj8_free(obj8_t *obj);
 LIBRAIN_EXPORT bool obj8_needs_upload(const obj8_t *obj);
+LIBRAIN_EXPORT void obj8_resolve_commands(obj8_t *obj);
 
 LIBRAIN_EXPORT int obj8_get_triangle_data(obj8_t *obj, obj8_vtx_t *data,
     unsigned cap);
