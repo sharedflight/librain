@@ -1990,11 +1990,26 @@ obj8_draw_group_by_cmdidx(obj8_t *obj, unsigned idx, GLuint prog,
 	if (obj->drset_auto_update)
 		(void)obj8_drset_update(obj->drset);
 
+	enum { MAX_STACK_DRS = 128 };
+	float dr_values_stack[MAX_STACK_DRS];
+	size_t n_drs = obj8_drset_get_all(obj->drset, NULL, 0);
+	float *dr_values;
+	if (n_drs > ARRAY_NUM_ELEM(dr_values_stack)) {
+		dr_values = safe_malloc(n_drs * sizeof (*dr_values));
+	} else {
+		dr_values = dr_values_stack;
+	}
+	obj8_drset_get_all(obj->drset, dr_values, n_drs);
+
 	glutils_debug_push(0, "obj8_draw_group_by_cmdidx(%s)",
 	    lacf_basename(obj->filename));
 #if	APL
 	glDisableClientState(GL_VERTEX_ARRAY);
 #endif
+	if (obj->vao != 0) {
+		glBindVertexArray(obj->vao);
+	}
+
 	glBindBuffer(GL_ARRAY_BUFFER, obj->vtx_buf);
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->idx_buf);
 
@@ -2005,7 +2020,7 @@ obj8_draw_group_by_cmdidx(obj8_t *obj, unsigned idx, GLuint prog,
 	else
 		glUniform1f(obj->light_level_loc, 0);
 	glm_mat4_mul((vec4 *)pvm_in, *obj->matrix, pvm);
-	obj8_draw_group_cmd(obj, obj->top, NULL, pvm, NULL);
+	obj8_draw_group_cmd(obj, obj->top, NULL, pvm, dr_values);
 
 	if (obj->vao != 0) {
 		glBindVertexArray(0);
@@ -2018,6 +2033,10 @@ obj8_draw_group_by_cmdidx(obj8_t *obj, unsigned idx, GLuint prog,
 	glutils_debug_pop();
 
 	GLUTILS_ASSERT_NO_ERROR();
+
+	if (n_drs > ARRAY_NUM_ELEM(dr_values_stack)) {
+		free(dr_values);
+	}
 }
 
 /*
