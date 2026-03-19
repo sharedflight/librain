@@ -1976,6 +1976,50 @@ obj8_draw_group(obj8_t *obj, const char *groupname, GLuint prog,
 	}
 }
 
+void
+obj8_draw_group_by_cmdidx(obj8_t *obj, unsigned idx, GLuint prog,
+    const mat4 pvm_in)
+{
+	mat4 pvm;
+
+	ASSERT(prog != 0);
+
+	if (!upload_data(obj))
+		return;
+
+	if (obj->drset_auto_update)
+		(void)obj8_drset_update(obj->drset);
+
+	glutils_debug_push(0, "obj8_draw_group_by_cmdidx(%s)",
+	    lacf_basename(obj->filename));
+#if	APL
+	glDisableClientState(GL_VERTEX_ARRAY);
+#endif
+	glBindBuffer(GL_ARRAY_BUFFER, obj->vtx_buf);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, obj->idx_buf);
+
+	setup_arrays(obj, prog);
+
+	if (!isnan(obj->light_level_override))
+		glUniform1f(obj->light_level_loc, obj->light_level_override);
+	else
+		glUniform1f(obj->light_level_loc, 0);
+	glm_mat4_mul((vec4 *)pvm_in, *obj->matrix, pvm);
+	obj8_draw_group_cmd(obj, obj->top, NULL, pvm, NULL);
+
+	if (obj->vao != 0) {
+		glBindVertexArray(0);
+	} else {
+		disable_vtx_attr_ptrs(obj);
+	}
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	glutils_debug_pop();
+
+	GLUTILS_ASSERT_NO_ERROR();
+}
+
 /*
  * Applies a pre-transform matrix to all geometry in the OBJ. You can use
  * this when the simple pos_offset parameter in obj8_parse isn't enough.
