@@ -1405,6 +1405,13 @@ obj8_needs_upload(const obj8_t *obj)
 	return (obj->load_complete && !obj->load_error && obj->vtx_buf == 0);
 }
 
+bool
+obj8_is_load_complete(const obj8_t *obj)
+{
+	ASSERT(obj != NULL);
+	return (obj->load_complete);
+}
+
 void
 obj8_resolve_commands(obj8_t *obj)
 {

@@ -165,6 +165,7 @@ typedef struct {
 LIBRAIN_EXPORT obj8_t *obj8_parse(const char *filename, vect3_t pos_offset);
 LIBRAIN_EXPORT void obj8_free(obj8_t *obj);
 LIBRAIN_EXPORT bool obj8_needs_upload(const obj8_t *obj);
+LIBRAIN_EXPORT bool obj8_is_load_complete(const obj8_t *obj);
 LIBRAIN_EXPORT void obj8_resolve_commands(obj8_t *obj);
 
 LIBRAIN_EXPORT int obj8_get_triangle_data(obj8_t *obj, obj8_vtx_t *data,
